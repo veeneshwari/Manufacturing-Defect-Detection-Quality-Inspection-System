@@ -33,7 +33,8 @@ def init_db():
           role          TEXT NOT NULL CHECK (role IN ('quality_engineer', 'supervisor')),
           created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
-
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expiry TIMESTAMPTZ;
         CREATE TABLE IF NOT EXISTS products (
           id               SERIAL PRIMARY KEY,
           product_code     TEXT NOT NULL,
