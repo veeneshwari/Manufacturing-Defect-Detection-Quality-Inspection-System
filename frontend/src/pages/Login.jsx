@@ -41,16 +41,13 @@ export default function Login() {
             </div>
           </div>
         </div>
-
         <h1 className="font-display" style={{ fontSize: 22, margin: '0 0 4px' }}>
           Sign in to your account
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: 13.5, margin: '0 0 24px' }}>
           Enter your registered email and password to access your inspection dashboard.
         </p>
-
         {error && <div className="alert-error">{error}</div>}
-
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 16 }}>
             <label className="field-label">Email Address</label>
@@ -76,6 +73,9 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          <p style={{ textAlign: 'right', fontSize: 12.5, marginTop: -14, marginBottom: 22 }}>
+            <Link className="link-teal" to="/forgot-password">Forgot password?</Link>
+          </p>
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? (
               <>
@@ -86,7 +86,6 @@ export default function Login() {
             )}
           </button>
         </form>
-
         <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', marginTop: 20 }}>
           Don't have an account? <Link className="link-teal" to="/register">Register here</Link>
         </p>
