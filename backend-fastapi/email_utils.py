@@ -7,7 +7,7 @@ EMAIL_APP_PASSWORD = os.getenv("EMAIL_APP_PASSWORD")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 def send_reset_email(to_email: str, token: str):
-    reset_link = f"{FRONTEND_URL}/reset-password?token={token}"
+    reset_link = f"{FRONTEND_URL}/#/reset-password?token={token}"
     body = f"""Hello,
 
 We received a request to reset your VisionInspect AI password.
