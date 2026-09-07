@@ -1,5 +1,5 @@
 // Central API client. Change API_BASE if the backend runs on a different host/port.
-const API_BASE = window.VISIONINSPECT_API_BASE || "https://manufacturing-defect-detection-quality.onrender.com";
+const API_BASE = window.VISIONINSPECT_API_BASE || 'http://localhost:8000';
 
 export const Auth = {
   getToken: () => localStorage.getItem('vi_token'),
@@ -41,10 +41,9 @@ async function apiRequest(path, { method = 'GET', body, isForm = false } = {}) {
     if (res.status === 401 && path !== '/api/auth/login') {
       Auth.clear();
     }
-    const message = (data && (data.detail || data.error)) || `Request failed (${res.status})`;
+    const message = (data && data.error) || `Request failed (${res.status})`;
     throw new Error(message);
   }
-
   return data;
 }
 
@@ -52,8 +51,7 @@ export const Api = {
   register: (payload) => apiRequest('/api/auth/register', { method: 'POST', body: payload }),
   login: (payload) => apiRequest('/api/auth/login', { method: 'POST', body: payload }),
   me: () => apiRequest('/api/auth/me'),
-  forgotPassword: (payload) => apiRequest('/api/auth/forgot-password', { method: 'POST', body: payload }),
-  resetPassword: (payload) => apiRequest('/api/auth/reset-password', { method: 'POST', body: payload }),
+
   uploadProduct: (formData) => apiRequest('/api/inspections/upload', { method: 'POST', body: formData, isForm: true }),
   runInspection: (productId) => apiRequest(`/api/inspections/run/${productId}`, { method: 'POST' }),
   listInspections: (params = {}) => {
@@ -61,11 +59,14 @@ export const Api = {
     return apiRequest(`/api/inspections${qs ? `?${qs}` : ''}`);
   },
   getInspection: (id) => apiRequest(`/api/inspections/${id}`),
+
   summary: () => apiRequest('/api/analytics/summary'),
   defectBreakdown: () => apiRequest('/api/analytics/defect-breakdown'),
   trends: (days = 14) => apiRequest(`/api/analytics/trends?days=${days}`),
   productionLines: () => apiRequest('/api/analytics/production-lines'),
+
   reports: (days = 30) => apiRequest(`/api/reports?days=${days}`),
   reportDetail: (date) => apiRequest(`/api/reports/${date}`),
+
   fileUrl: (relPath) => `${API_BASE}${relPath}`,
 };
