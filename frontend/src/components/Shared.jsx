@@ -26,12 +26,23 @@ export function ErrorBanner({ message }) {
   return <div className="alert-error">{message}</div>;
 }
 
-export function EmptyState({ title, subtitle }) {
+// Icon defaults to context — pass one of 'upload' | 'search' | 'report' | 'trend' | 'inbox',
+// or any custom character/emoji for a one-off case.
+const EMPTY_ICONS = {
+  upload: '⇪',
+  search: '◎',
+  report: '▤',
+  trend: '∿',
+  inbox: '□',
+};
+
+export function EmptyState({ title, subtitle, icon = 'inbox' }) {
+  const glyph = EMPTY_ICONS[icon] || icon;
   return (
-    <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
-      <div style={{ fontSize: 28, marginBottom: 8 }}>🚸</div>
-      <div style={{ color: 'var(--text)', fontWeight: 600, marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 13 }}>{subtitle}</div>
+    <div className="empty-state">
+      <div className="empty-state-icon" aria-hidden="true">{glyph}</div>
+      <div className="empty-state-title">{title}</div>
+      {subtitle ? <div className="empty-state-subtitle">{subtitle}</div> : null}
     </div>
   );
 }
@@ -44,6 +55,20 @@ export function KpiCard({ label, value, suffix = '', accent }) {
         {suffix}
       </div>
       <div className="kpi-label">{label}</div>
+    </div>
+  );
+}
+
+// Wrap a row of <KpiCard> elements in this to get the one-time scan-sweep
+// animation across the row on page load. Use like:
+//   <KpiRow><KpiCard .../><KpiCard .../></KpiRow>
+export function KpiRow({ children, columns = 4 }) {
+  return (
+    <div
+      className="kpi-row"
+      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+    >
+      {children}
     </div>
   );
 }
