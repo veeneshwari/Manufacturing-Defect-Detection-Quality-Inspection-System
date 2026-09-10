@@ -16,3 +16,4 @@ torchvision==0.20.1+cpu
 opencv-python==4.10.0.84
 numpy==2.1.2
 pillow==12.3.0
+cloudinary
