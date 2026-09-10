@@ -1,10 +1,8 @@
 import os
-import tempfile
+import time
+import random
 from typing import Optional
 
-import cloudinary
-import cloudinary.uploader
-import requests
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 
 from database import get_conn
@@ -13,13 +11,8 @@ from defect_engine import run_inspection
 
 router = APIRouter(prefix="/api/inspections", tags=["inspections"])
 
-# Cloudinary config — reads from environment variables set in Render.
-cloudinary.config(
-    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
-    api_key=os.getenv("CLOUDINARY_API_KEY"),
-    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
-    secure=True,
-)
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/bmp", "image/webp"}
 MAX_SIZE_BYTES = 20 * 1024 * 1024  # 20MB
@@ -43,8 +36,7 @@ def row_to_inspection(row) -> dict:
             "category": row["category"],
             "batch_number": row["batch_number"],
             "production_line": row["production_line"],
-            # image_path now stores a full Cloudinary URL, so use it directly.
-            "image_url": row["image_path"],
+            "image_url": f"/uploads/{os.path.basename(row['image_path'])}",
         },
         "defect_type": row["defect_type"],
         "status": row["status"],
@@ -83,17 +75,10 @@ async def upload_product(
     if len(contents) > MAX_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="Image exceeds the 20MB upload limit")
 
-    # Upload straight to Cloudinary — this survives backend redeploys,
-    # unlike writing to the container's local disk.
-    try:
-        upload_result = cloudinary.uploader.upload(
-            contents,
-            folder="visioninspect",
-            resource_type="image",
-        )
-        image_url = upload_result["secure_url"]
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Image upload to Cloudinary failed: {e}")
+    ext = os.path.splitext(image.filename or "")[1] or ".jpg"
+    filename = f"product_{int(time.time() * 1000)}_{random.randint(0, 999999)}{ext}"
+    with open(os.path.join(UPLOAD_DIR, filename), "wb") as f:
+        f.write(contents)
 
     conn = get_conn()
     cur = conn.cursor()
@@ -101,7 +86,7 @@ async def upload_product(
         """INSERT INTO products
            (product_code, product_name, category, batch_number, production_line, production_date, image_path, uploaded_by)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
-        (product_code, product_name, category, batch_number, production_line, production_date, image_url, current_user["id"]),
+        (product_code, product_name, category, batch_number, production_line, production_date, filename, current_user["id"]),
     )
     product_id = cur.fetchone()["id"]
     conn.commit()
@@ -116,7 +101,7 @@ async def upload_product(
             "category": category,
             "batch_number": batch_number,
             "production_line": production_line,
-            "image_url": image_url,
+            "image_url": f"/uploads/{filename}",
         }
     }
 
@@ -132,27 +117,8 @@ def run_inspection_endpoint(product_id: int, current_user: dict = Depends(get_cu
         conn.close()
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # image_path is now a Cloudinary URL — download it to a temp local file
-    # so the existing defect_engine (which expects a local path) still works.
-    image_url = product["image_path"]
-    tmp_path = None
-    try:
-        resp = requests.get(image_url, timeout=20)
-        resp.raise_for_status()
-        ext = os.path.splitext(image_url.split("?")[0])[1] or ".jpg"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-            tmp.write(resp.content)
-            tmp_path = tmp.name
-
-        result = run_inspection(tmp_path)
-    except Exception as e:
-        cur.close()
-        conn.close()
-        raise HTTPException(status_code=502, detail=f"Could not fetch or process image: {e}")
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.remove(tmp_path)
-
+    image_path = os.path.join(UPLOAD_DIR, product["image_path"])
+    result = run_inspection(image_path)
     bbox = result["bbox"]
 
     cur.execute(
