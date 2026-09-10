@@ -6,27 +6,17 @@ from auth import get_current_user
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 
-def _user_filter(current_user: dict):
-    """Returns (sql_clause, params) restricting to the current user's own
-    inspections when they're a Quality Engineer. Supervisors see everything."""
-    if current_user.get("role") == "quality_engineer":
-        return "WHERE inspected_by = %s", [current_user["id"]]
-    return "", []
-
-
 @router.get("/summary")
 def summary(current_user: dict = Depends(get_current_user)):
     conn = get_conn()
     cur = conn.cursor()
-    where_clause, params = _user_filter(current_user)
     cur.execute(
-        f"""SELECT
+        """SELECT
              COUNT(*) AS total_inspected,
              SUM(CASE WHEN status = 'fail' THEN 1 ELSE 0 END) AS defects_detected,
              SUM(CASE WHEN status = 'pass' THEN 1 ELSE 0 END) AS passed,
              AVG(confidence_score) AS avg_confidence
-           FROM inspections {where_clause}""",
-        params,
+           FROM inspections"""
     )
     row = cur.fetchone()
     cur.close()
@@ -48,22 +38,16 @@ def summary(current_user: dict = Depends(get_current_user)):
 def defect_breakdown(current_user: dict = Depends(get_current_user)):
     conn = get_conn()
     cur = conn.cursor()
-    where_clause, params = _user_filter(current_user)
-    fail_clause = "status = 'fail'"
-    combined_where = f"{where_clause} AND {fail_clause}" if where_clause else f"WHERE {fail_clause}"
-
     cur.execute(
-        f"""SELECT defect_type, COUNT(*) AS count
-           FROM inspections {combined_where}
-           GROUP BY defect_type ORDER BY count DESC""",
-        params,
+        """SELECT defect_type, COUNT(*) AS count
+           FROM inspections WHERE status = 'fail'
+           GROUP BY defect_type ORDER BY count DESC"""
     )
     rows = cur.fetchall()
     cur.execute(
-        f"""SELECT severity_level, COUNT(*) AS count
-           FROM inspections {combined_where}
-           GROUP BY severity_level""",
-        params,
+        """SELECT severity_level, COUNT(*) AS count
+           FROM inspections WHERE status = 'fail'
+           GROUP BY severity_level"""
     )
     severity_rows = cur.fetchall()
     cur.close()
@@ -87,21 +71,17 @@ def defect_breakdown(current_user: dict = Depends(get_current_user)):
 def trends(days: int = Query(14, le=90), current_user: dict = Depends(get_current_user)):
     conn = get_conn()
     cur = conn.cursor()
-    where_clause, params = _user_filter(current_user)
-    date_clause = "created_at >= NOW() - (%s * INTERVAL '1 day')"
-    combined_where = f"{where_clause} AND {date_clause}" if where_clause else f"WHERE {date_clause}"
-
     cur.execute(
-        f"""SELECT
+        """SELECT
               created_at::date AS day,
               COUNT(*) AS total,
               SUM(CASE WHEN status = 'fail' THEN 1 ELSE 0 END) AS defects,
               SUM(CASE WHEN status = 'pass' THEN 1 ELSE 0 END) AS passed,
               AVG(severity_score) AS avg_severity
             FROM inspections
-            {combined_where}
+            WHERE created_at >= NOW() - (%s * INTERVAL '1 day')
             GROUP BY day ORDER BY day ASC""",
-        params + [days],
+        (days,),
     )
     rows = cur.fetchall()
     cur.close()
@@ -125,12 +105,8 @@ def trends(days: int = Query(14, le=90), current_user: dict = Depends(get_curren
 def production_lines(current_user: dict = Depends(get_current_user)):
     conn = get_conn()
     cur = conn.cursor()
-    where_clause, params = _user_filter(current_user)
-    # Note: table is aliased "i" here, so the filter column needs the prefix.
-    where_clause_i = where_clause.replace("inspected_by", "i.inspected_by")
-
     cur.execute(
-        f"""SELECT
+        """SELECT
              COALESCE(p.production_line, 'Unassigned') AS production_line,
              COUNT(i.id) AS total_inspected,
              SUM(CASE WHEN i.status = 'fail' THEN 1 ELSE 0 END) AS defects,
@@ -139,10 +115,8 @@ def production_lines(current_user: dict = Depends(get_current_user)):
              MAX(i.created_at) AS last_inspection
            FROM inspections i
            JOIN products p ON p.id = i.product_id
-           {where_clause_i}
            GROUP BY production_line
-           ORDER BY total_inspected DESC""",
-        params,
+           ORDER BY total_inspected DESC"""
     )
     rows = cur.fetchall()
     cur.close()
