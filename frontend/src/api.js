@@ -61,10 +61,5 @@ export const Api = {
   productionLines: () => apiRequest('/api/analytics/production-lines'),
   reports: (days = 30) => apiRequest(`/api/reports?days=${days}`),
   reportDetail: (date) => apiRequest(`/api/reports/${date}`),
-  // Cloudinary URLs are already absolute (start with http). Old records made
-  // before this change stored a local "/uploads/..." path — those files no
-  // longer exist on the server (see the ephemeral-disk issue), so there's
-  // nothing meaningful to point them to; we just return them as-is and the
-  // <img> will show broken for those specific old rows.
-  fileUrl: (relPath) => (relPath && relPath.startsWith('http') ? relPath : `${API_BASE}${relPath}`),
+  fileUrl: (relPath) => `${API_BASE}${relPath}`,
 };
