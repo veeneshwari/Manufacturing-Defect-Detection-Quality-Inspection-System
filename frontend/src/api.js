@@ -63,3 +63,4 @@ export const Api = {
   reportDetail: (date) => apiRequest(`/api/reports/${date}`),
   fileUrl: (relPath) => `${API_BASE}${relPath}`,
 };
+
